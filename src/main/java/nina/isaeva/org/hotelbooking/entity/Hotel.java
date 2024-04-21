@@ -84,5 +84,9 @@ public class Hotel {
         this.hotelCategory = hotelCategory;
     }
 
+    public List<Room>getAllRooms (){
+        return rooms;
+    }
+
 
 }

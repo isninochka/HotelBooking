@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Slf4j
@@ -27,9 +28,8 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final BookingMapper bookingMapper;
+    private final HotelService hotelService;
     private final HotelRepository hotelRepository;
-
-
 
 
     public Set<BookingResponseDto> getAllBookings() {
@@ -49,27 +49,34 @@ public class BookingService {
 
     @Transactional
     public BookingResponseDto addBooking(BookingRequestDto bookingRequestDto) {
-        Hotel hotel = hotelRepository.findByHotelName(bookingRequestDto.getHotelName());
-        if (hotel == null) {
-            throw new HotelNotFoundException();
+
+        List<Hotel> hotels = hotelRepository.findAll();
+        for (Hotel hotel : hotels) {
+            if (hotel.getHotelName().equals(bookingRequestDto.getHotelName())) {
+
+                Room room = hotel.getRooms().stream()
+                        .filter(r -> r.getRoomCategory().equals(bookingRequestDto.getRoomCategory()) && !r.isBooked())
+                        .findFirst()
+                        .orElseThrow(RoomAlreadyBookedException::new);
+
+
+                LocalDate checkIn = bookingRequestDto.getCheckInDate();
+                LocalDate checkOut = bookingRequestDto.getCheckOutDate();
+                if (!isRoomAvailable(room, checkIn, checkOut)) {
+                    double totalPrice = calculatePrice(room, checkIn, checkOut);
+                    room.setBooked(true);
+                    Booking booking = bookingMapper.toBooking(bookingRequestDto);
+                    return new BookingResponseDto(
+                            booking.getHotel().getHotelName(), booking.getCheckInDate(), booking.getCheckOutDate(),
+                            booking.getHotel().getHotelName(), booking.getRoom().getRoomNumber(), totalPrice
+                    );
+
+                } else {
+                    return null;
+                }
+            }
         }
-        Room room = hotel.getRooms().stream()
-                .filter(r->r.getRoomCategory().equals(bookingRequestDto.getRoomCategory()) && !r.isBooked())
-                .findFirst()
-                .orElseThrow(RoomAlreadyBookedException::new);
-
-        LocalDate checkIn = bookingRequestDto.getCheckInDate();
-        LocalDate checkOut = bookingRequestDto.getCheckOutDate() ;
-        if(!isRoomAvailable(room, checkIn, checkOut)) {
-            double totalPrice = calculatePrice(room,checkIn,checkOut);
-            room.setBooked(true);
-            Booking booking = bookingMapper.toBooking(bookingRequestDto);
-            return bookingMapper.toBookingResponseDto(booking);
-
-        } else {
-            return null;
-        }
-
+        return null;
 
     }
 
